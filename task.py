@@ -1,18 +1,17 @@
 from datetime import datetime
 from argparse import ArgumentParser
+from tabulate import tabulate
 import json
 import sys
-
-
 
 """
     Plan (super rough):
     1. Create a way to open json and save json
     2. Create functions for add, update, deleting tasks
+    3. Create functions for marking as in progress or done
 """
 
-def main():
-    # TODO
+def main() -> None:
     supported_queries = get_supported_queries()
     querie, args = get_querie(supported_queries)
     DATABASE_PATH = "task.json"
@@ -44,7 +43,10 @@ def save_database(database: dict[str, dict], path: str) -> None:
     with open(path, "w") as f:
         json.dump(database, f)
 
-def get_supported_queries():
+def get_supported_queries() -> dict[str, dict]:
+    """
+        Returns a dictionary of keyword value pairs to be used to create an Argument Parser
+    """
     return {
         "add": {
             "target": add_task,
@@ -68,9 +70,39 @@ def get_supported_queries():
                 {"name_or_flags": ["id"], "help": "ID of task to delete"}
             ],
         },
+        "mark-in-progress": {
+            "target": mark_in_progress,
+            "help": "Mark a task to be in progress",
+            "args": [
+                {"name_or_flags": ["id"], "help": "ID of task to mark in progress"}
+            ],
+        },
+        "mark-done": {
+            "target": mark_done,
+            "help": "Mark a task to be done",
+            "args": [
+                {"name_or_flags": ["id"], "help": "ID of task to mark done"}
+            ],
+        },
+        "list": {
+            "target": list_tasks,
+            "help": "List tasks in a table",
+            "args": [
+                {
+                    "name_or_flags": ["status"], 
+                    "help": "Status of tasks to filter by",
+                    "choices": ["all", "todo", "in-progress", "done", ""],
+                    "default": "all",
+                    "nargs": "?",
+                }
+            ],
+        },
     }
 
-def get_querie(supported_queries: dict[str, dict]):
+def get_querie(supported_queries: dict[str, dict]) -> tuple[callable, dict]:
+    """
+        Builds the argument parser, parses/validates the command line input, returning the appropriate function and arguments
+    """
     parser = ArgumentParser(description="CLI Task Tracker from roadmap.sh")
     sub_parsers = parser.add_subparsers(dest="command", required=True)
 
@@ -85,6 +117,9 @@ def get_querie(supported_queries: dict[str, dict]):
     return querie, args    
 
 def add_task(database: dict[str, dict], description: str) -> None:
+    """
+        Adds a new task, automatically assigning an ID
+    """
     id = str(int(max("0", *database.keys())) + 1)
     today = datetime.now().isoformat()
     database[id] = {
@@ -93,16 +128,61 @@ def add_task(database: dict[str, dict], description: str) -> None:
         "createdAt": today,
         "updatedAt": today
     }
+    print(f"Task added successfully (ID: {id})")
+    list_tasks({id: database[id]})
 
 def update_task(database: dict[str, dict], id: str, description: str) -> None:
-    
+    """
+        Updates the description of an existing task
+    """
     database[id]["description"] = description
     database[id]["updatedAt"] = datetime.now().isoformat()
+    print(f"Task updated successfully (ID: {id})")
+    list_tasks({id: database[id]})
 
-def delete_task(database: dict[str, dict], id: str):
+def delete_task(database: dict[str, dict], id: str) -> None:
+    """
+        Deletes an existing task
+    """
     del database[id]
+    print(f"Task deleted successfully (ID: {id})")
 
+def mark_in_progress(database: dict[str, dict], id: str) -> None:
+    """
+        Sets the status of a task to be 'in progress'
+    """
+    database[id]["status"] = "in-progress"
+    database[id]["updatedAt"] = datetime.now().isoformat()
+    print(f"Task marked as in-progress (ID: {id})")
+    list_tasks({id: database[id]})
 
+def mark_done(database: dict[str, dict], id: str) -> None:
+    """
+        Sets the status of atask to be 'done'
+    """
+    database[id]["status"] = "done"
+    database[id]["updatedAt"] = datetime.now().isoformat()
+    print(f"Task marked as done (ID: {id})")
+    list_tasks({id: database[id]})
+
+def list_tasks(database: dict[str, dict], status: str = "all") -> None:
+    """
+        List tasks based on status - default is 'all'
+    """
+    DATETIME_FORMAT = "%d/%m/%Y %H:%M:%S"
+    table = (
+        {
+            "ID": id,
+            "Description": props["description"],
+            "Status": props["status"],
+            "Created At": datetime.fromisoformat(props["createdAt"]).strftime(DATETIME_FORMAT),
+            "Updated At": datetime.fromisoformat(props["updatedAt"]).strftime(DATETIME_FORMAT),
+        }
+        for id, props in database.items()
+        if status == "all" or status == props["status"]
+    )
+    
+    print(tabulate(table, headers="keys", tablefmt="rounded_outline") or "Nothing to display")
 
 if __name__ == '__main__':
     main()

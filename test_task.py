@@ -4,6 +4,8 @@ from task import (
     add_task,
     update_task,
     delete_task,
+    mark_in_progress,
+    mark_done,
 )
 
 DATABASE_PATH = "test.json"
@@ -34,6 +36,36 @@ def test_update_task():
         update_task(database, "100", "this wont work")
     with pytest.raises(KeyError):
         update_task(database, 1, "this wont work")
+
+def test_mark_in_progress():
+    # mark a few tasks in progress
+    mark_in_progress(database, "1")
+    assert database["1"]["status"] == "in-progress"
+
+    # also check update time changes
+    mark_in_progress(database, "2")
+    assert database["2"]["status"] == "in-progress" and database["2"]["createdAt"] != database["2"]["updatedAt"]
+
+    # attempt to mark tasks that do not exist
+    with pytest.raises(KeyError):
+        mark_in_progress(database, "99")
+    with pytest.raises(KeyError):
+        mark_in_progress(database, "15")
+
+def test_mark_done():
+    # mark a few tasks to be done
+    mark_done(database, "1")
+    assert database["1"]["status"] == "done"
+
+    # also check update time changes
+    mark_done(database, "4")
+    assert database["2"]["status"] == "in-progress" and database["4"]["createdAt"] != database["4"]["updatedAt"]
+
+    # attempt to mark tasks that do not exist
+    with pytest.raises(KeyError):
+        mark_done(database, "99")
+    with pytest.raises(KeyError):
+        mark_done(database, "15")
 
 def test_delete_task():
     # delete tasks
